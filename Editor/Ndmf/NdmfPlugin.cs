@@ -24,8 +24,6 @@ namespace net.puk06.PropertySyncer.Editor.Ndmf
                 .Run(ReplaceTextures.Instance)
 #if LLC_2_4_0_OR_NEWER
                 .BeforePass("io.github.azukimochi.light-limit-changer.normalize-materials")
-#else
-                .BeforePlugin("io.github.azukimochi.light-limit-changer")
 #endif
                 .PreviewingWith(new RealtimePreview());
 
