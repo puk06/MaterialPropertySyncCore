@@ -107,7 +107,7 @@ namespace net.puk06.PropertySyncer.Editor.Ndmf
         {
             private Dictionary<Renderer, Material?[]>? _processedMaterialDictionary;
 
-            public RenderAspects WhatChanged { get; private set; } = RenderAspects.Texture & RenderAspects.Material;
+            public RenderAspects WhatChanged { get; private set; } = RenderAspects.Texture | RenderAspects.Material;
 
             public MaterialReplacerNode(Dictionary<Renderer, Material?[]>? processedMaterialDictionary)
             {
