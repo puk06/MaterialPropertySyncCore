@@ -83,7 +83,7 @@ namespace net.puk06.PropertySyncer.Editor.Ndmf
 
                 foreach ((Renderer original, Renderer proxy) in proxyPairs)
                 {
-                    processedMaterialDictionary[original] = NdmfProcessor.SyncShadowSettingsInRenderer(components, proxy);
+                    processedMaterialDictionary[original] = NdmfProcessor.SyncShadowSettingsInRenderer(components, proxy, isPreview: true);
                 }
 
                 return Task.FromResult<IRenderFilterNode>(new MaterialReplacerNode(processedMaterialDictionary));

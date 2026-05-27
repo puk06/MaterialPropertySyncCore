@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using nadena.dev.ndmf;
 using net.puk06.PropertySyncer.Editor.Extension;
-using net.puk06.PropertySyncer.Editor.Utils;
 using UnityEditor;
 using UnityEngine;
 
@@ -11,7 +10,7 @@ namespace net.puk06.PropertySyncer.Editor.Ndmf
 {
     internal class NdmfProcessor
     {
-        internal static Material?[] SyncShadowSettingsInRenderer(IEnumerable<AbstractMaterialPropertySync> components, Renderer renderer)
+        internal static Material?[] SyncShadowSettingsInRenderer(IEnumerable<AbstractMaterialPropertySync> components, Renderer renderer, bool isPreview = true)
         {
             Material?[] materials = renderer.sharedMaterials;
             Material?[] newMaterials = new Material[materials.Length];
@@ -31,7 +30,7 @@ namespace net.puk06.PropertySyncer.Editor.Ndmf
 
                     foreach (AbstractMaterialPropertySync component in components)
                     {
-                        if (!component.IsActivePSComponent()) continue;
+                        if (!component.IsActivePSComponent(isPreview)) continue;
                         if (component.TargetMaterials.Contains(originalMaterial))
                         {
                             newMaterials[i] = GetProcessedMaterial(component.SourceMaterial, materials[i], component.TargetPropertyNames, component.IncludeTexture);
