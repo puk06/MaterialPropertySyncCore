@@ -31,6 +31,7 @@ namespace net.puk06.PropertySyncer.Editor.Ndmf
 
                     foreach (AbstractMaterialPropertySync component in components)
                     {
+                        if (!component.IsActivePSComponent()) continue;
                         if (component.TargetMaterials.Contains(originalMaterial))
                         {
                             newMaterials[i] = GetProcessedMaterial(component.SourceMaterial, materials[i], component.TargetPropertyNames, component.IncludeTexture);

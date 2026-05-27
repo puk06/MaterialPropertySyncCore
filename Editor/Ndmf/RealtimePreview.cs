@@ -52,7 +52,7 @@ namespace net.puk06.PropertySyncer.Editor.Ndmf
 
                     if (targetRenderers.Count > 0)
                     {
-                        targetRenderGroups.Add(RenderGroup.For(targetRenderers).WithData(components));
+                        targetRenderGroups.Add(RenderGroup.For(targetRenderers).WithData(avatarGameObject));
                     }
                 }
                 catch (Exception ex)
@@ -70,21 +70,20 @@ namespace net.puk06.PropertySyncer.Editor.Ndmf
 
             try
             {
-                AbstractMaterialPropertySync[] components = group.GetData<AbstractMaterialPropertySync[]>();
+                GameObject root = group.GetData<GameObject>();
+
+                AbstractMaterialPropertySync[] components = root.GetComponentsInChildren<AbstractMaterialPropertySync>(true);
+                if (components.Length == 0) return Task.FromResult<IRenderFilterNode>(new EmptyNode());
+
                 foreach (AbstractMaterialPropertySync component in components)
                 {
                     context.Observe(component);
-                    if (component.SourceMaterial != null)
-                    {
-                        context.Observe(component, c => new Material(c.SourceMaterial), (a, b) => MaterialPropertyUtils.CalculatePropertyHash(a, component.TargetPropertyNames) == MaterialPropertyUtils.CalculatePropertyHash(b, component.TargetPropertyNames));
-                    }
+                    context.Observe(component, c => new List<Material?>(c.TargetMaterials), (a, b) => a.SequenceEqual(b));
                 }
-
-                IEnumerable<AbstractMaterialPropertySync> enabledParentComponents = components.Where(i => context.ActiveInHierarchy(i.gameObject) && i.IsEnabled && i.IsPreviewEnabled);
 
                 foreach ((Renderer original, Renderer proxy) in proxyPairs)
                 {
-                    processedMaterialDictionary[original] = NdmfProcessor.SyncShadowSettingsInRenderer(enabledParentComponents, proxy);
+                    processedMaterialDictionary[original] = NdmfProcessor.SyncShadowSettingsInRenderer(components, proxy);
                 }
 
                 return Task.FromResult<IRenderFilterNode>(new MaterialReplacerNode(processedMaterialDictionary));
@@ -140,6 +139,16 @@ namespace net.puk06.PropertySyncer.Editor.Ndmf
                     _processedMaterialDictionary.Clear();
                     _processedMaterialDictionary = null;
                 }
+            }
+        }
+
+        private class EmptyNode : IRenderFilterNode
+        {
+            public RenderAspects WhatChanged { get; private set; } = 0;
+
+            public void OnFrame(Renderer original, Renderer proxy)
+            {
+                // Do nothing
             }
         }
     }
