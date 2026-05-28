@@ -30,7 +30,6 @@ namespace net.puk06.PropertySyncer.Editor.Ndmf
 
                     foreach (AbstractMaterialPropertySync component in components)
                     {
-                        context.Observe(component, c => new List<Material?>(c.TargetMaterials), (a, b) => a.SequenceEqual(b));
                         foreach (Material? material in component.TargetMaterials)
                         {
                             if (material == null || targetMaterials.Contains(material)) continue;
@@ -78,7 +77,8 @@ namespace net.puk06.PropertySyncer.Editor.Ndmf
                 foreach (AbstractMaterialPropertySync component in components)
                 {
                     context.Observe(component);
-                    context.Observe(component, c => new List<Material?>(c.TargetMaterials), (a, b) => a.SequenceEqual(b));
+                    context.Observe(component, c => c.PreviewRefreshRequested, (a, b) => a == b);
+                    component.PreviewRefreshRequested = false;
                 }
 
                 foreach ((Renderer original, Renderer proxy) in proxyPairs)
