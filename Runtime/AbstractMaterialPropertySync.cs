@@ -25,8 +25,5 @@ namespace net.puk06.PropertySyncer
 
         [HideInInspector]
         abstract public string[] TargetPropertyNames { get; }
-
-        [HideInInspector]
-        public bool PreviewRefreshRequested { get; set; } = false;
     }
 }

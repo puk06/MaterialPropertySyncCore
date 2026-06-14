@@ -5,7 +5,6 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading.Tasks;
 using nadena.dev.ndmf.preview;
-using net.puk06.PropertySyncer.Editor.Utils;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -40,9 +39,7 @@ namespace net.puk06.PropertySyncer.Editor.Ndmf
                     List<Renderer> targetRenderers = new();
                     foreach (Renderer avatarRenderer in context.GetComponentsInChildren<Renderer>(avatarGameObject, true).Where(r => r is MeshRenderer or SkinnedMeshRenderer))
                     {
-                        context.Observe(avatarRenderer);
-                        
-                        Material[] materials = avatarRenderer.sharedMaterials;
+                        Material[] materials = context.Observe(avatarRenderer, i => i.sharedMaterials, (a, b) => a != null && b != null && a.SequenceEqual(b));
                         if (materials == null) continue;
 
                         if (materials.Any(i => targetMaterials.Contains(i)))
@@ -79,8 +76,11 @@ namespace net.puk06.PropertySyncer.Editor.Ndmf
                 foreach (AbstractMaterialPropertySync component in components)
                 {
                     context.Observe(component);
-                    context.Observe(component, c => c.PreviewRefreshRequested, (a, b) => a == b);
-                    component.PreviewRefreshRequested = false;
+                    if (component.SourceMaterial != null)
+                    {
+                        context.Observe(component, c => c.SourceMaterial == null ? -1 : c.SourceMaterial.ComputeCRC(), (a, b) => a == b);
+                    }
+                    context.Observe(component, c => new List<Material?>(c.TargetMaterials), (a, b) => a.SequenceEqual(b));
                 }
 
                 foreach ((Renderer original, Renderer proxy) in proxyPairs)
