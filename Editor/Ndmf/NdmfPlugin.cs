@@ -41,7 +41,7 @@ namespace net.puk06.PropertySyncer.Editor.Ndmf
             GameObject avatar = context.AvatarRootObject;
             AbstractMaterialPropertySync[] components = avatar.GetComponentsInChildren<AbstractMaterialPropertySync>(false);
 
-            IEnumerable<Renderer> renderers = avatar.GetComponentsInChildren<Renderer>().Where(r => r is MeshRenderer or SkinnedMeshRenderer);
+            IEnumerable<Renderer> renderers = avatar.GetComponentsInChildren<Renderer>(true).Where(r => r is MeshRenderer or SkinnedMeshRenderer);
             foreach (Renderer renderer in renderers)
             {
                 renderer.sharedMaterials = NdmfProcessor.SyncShadowSettingsInRenderer(components, renderer);
