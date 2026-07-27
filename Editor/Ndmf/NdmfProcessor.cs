@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using nadena.dev.ndmf;
@@ -10,49 +11,121 @@ namespace net.puk06.PropertySyncer.Editor.Ndmf
 {
     internal class NdmfProcessor
     {
-        internal static Material?[] SyncShadowSettingsInRenderer(IEnumerable<AbstractMaterialPropertySync> components, Renderer renderer, bool isPreview = true)
+        internal static Dictionary<Material, Material> BuildProcessedMaterialDictionary(
+            IEnumerable<AbstractMaterialPropertySync> components,
+            IEnumerable<Renderer> renderers,
+            bool isPreview = true)
         {
-            Material?[] materials = renderer.sharedMaterials;
-            Material?[] newMaterials = new Material[materials.Length];
+            var result = new Dictionary<Material, Material>();
 
-            for (int i = 0; i < materials.Length; i++)
+            var activeComponents = new List<AbstractMaterialPropertySync>();
+            foreach (var c in components)
+                if (c.IsActivePSComponent(isPreview))
+                    activeComponents.Add(c);
+
+            if (activeComponents.Count == 0) return result;
+
+            var targetMap = new Dictionary<Material, AbstractMaterialPropertySync>();
+            foreach (var component in activeComponents)
             {
-                if (materials[i] == null) continue;
-
-                Material? originalMaterial = ObjectRegistry.GetReference(materials[i]).Object as Material;
-                if (originalMaterial == null)
+                foreach (var targetMat in component.TargetMaterials)
                 {
-                    newMaterials[i] = Object.Instantiate(materials[i]);
+                    if (targetMat == null) continue;
+                    var resolved = ObjectRegistry.GetReference(targetMat).Object as Material;
+                    if (resolved == null) resolved = targetMat;
+                    
+                    if (!targetMap.ContainsKey(resolved))
+                        targetMap[resolved] = component;
                 }
-                else
-                {
-                    bool processed = false;
-
-                    foreach (AbstractMaterialPropertySync component in components)
-                    {
-                        if (!component.IsActivePSComponent(isPreview)) continue;
-                        if (component.TargetMaterials.Contains(originalMaterial))
-                        {
-                            newMaterials[i] = GetProcessedMaterial(component.SourceMaterial, materials[i], component.TargetPropertyNames, component.IncludeTexture);
-                            processed = true;
-                            break;
-                        }
-                    }
-
-                    if (!processed) newMaterials[i] = Object.Instantiate(materials[i]);
-                }
-
-                ObjectRegistry.RegisterReplacedObject(materials[i], newMaterials[i]);
             }
 
-            return newMaterials;
+            if (targetMap.Count == 0) return result;
+
+            foreach (var renderer in renderers)
+            {
+                foreach (var mat in renderer.sharedMaterials)
+                {
+                    if (mat == null) continue;
+                    var resolved = ObjectRegistry.GetReference(mat).Object as Material;
+                    if (resolved == null) resolved = mat;
+                    
+                    if (!targetMap.TryGetValue(resolved, out var component)) continue;
+                    if (result.ContainsKey(resolved)) continue;
+                    if (component.SourceMaterial == null) continue;
+
+                    var processed = GetProcessedMaterial(component.SourceMaterial, mat, component.TargetPropertyNames, component.IncludeTexture);
+                    if (processed != null)
+                        result[resolved] = processed;
+                }
+            }
+
+            return result;
+        }
+
+        internal static void ReplaceMaterialsInRenderers(IEnumerable<Renderer> renderers, Dictionary<Material, Material> processedMaterialDictionary)
+        {
+            if (processedMaterialDictionary.Count == 0) return;
+
+            foreach (var renderer in renderers)
+            {
+                var materials = renderer.sharedMaterials;
+                bool changed = false;
+
+                foreach (ref var material in materials.AsSpan())
+                {
+                    if (material == null) continue;
+
+                    var resolved = ObjectRegistry.GetReference(material).Object as Material;
+                    if (resolved == null) resolved = material;
+
+                    if (processedMaterialDictionary.TryGetValue(resolved, out var processed))
+                    {
+                        ObjectRegistry.RegisterReplacedObject(resolved, processed);
+                        material = processed;
+                        changed = true;
+                    }
+                }
+
+                if (changed) renderer.sharedMaterials = materials;
+            }
+        }
+
+        internal static Material?[] GetReplacedMaterials(Material?[] materials, Dictionary<Material, Material> processedMaterialDictionary, Dictionary<Material, Material> materialMap)
+        {
+            if (processedMaterialDictionary.Count == 0) return materials;
+
+            var newMaterials = (Material?[])materials.Clone();
+            bool changed = false;
+
+            for (int i = 0; i < newMaterials.Length; i++)
+            {
+                var newMaterial = newMaterials[i];
+                if (newMaterial == null) continue;
+
+                var resolved = ObjectRegistry.GetReference(newMaterial).Object as Material;
+                if (resolved == null) resolved = newMaterial;
+
+                if (materialMap.TryGetValue(resolved, out var cached))
+                {
+                    newMaterials[i] = cached;
+                    changed = true;
+                }
+                else if (processedMaterialDictionary.TryGetValue(resolved, out var processed))
+                {
+                    materialMap[resolved] = processed;
+                    newMaterials[i] = processed;
+                    changed = true;
+                }
+            }
+
+            return changed ? newMaterials : materials;
         }
 
         internal static Material? GetProcessedMaterial(Material? sourceMaterial, Material? targetMaterial, string[] targetProperties, bool includeTexture)
         {
             if (sourceMaterial == null || targetMaterial == null) return null;
 
-            Material newMaterial = Object.Instantiate(targetMaterial);
+            var newMaterial = UnityEngine.Object.Instantiate(targetMaterial);
 
             sourceMaterial.ForEachProperty((propertyType, propName) =>
             {

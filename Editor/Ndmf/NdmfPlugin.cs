@@ -42,10 +42,9 @@ namespace net.puk06.PropertySyncer.Editor.Ndmf
             AbstractMaterialPropertySync[] components = avatar.GetComponentsInChildren<AbstractMaterialPropertySync>(false);
 
             IEnumerable<Renderer> renderers = avatar.GetComponentsInChildren<Renderer>(true).Where(r => r is MeshRenderer or SkinnedMeshRenderer);
-            foreach (Renderer renderer in renderers)
-            {
-                renderer.sharedMaterials = NdmfProcessor.SyncShadowSettingsInRenderer(components, renderer);
-            }
+
+            var processedMaterials = NdmfProcessor.BuildProcessedMaterialDictionary(components, renderers);
+            NdmfProcessor.ReplaceMaterialsInRenderers(renderers, processedMaterials);
         }
     }
 

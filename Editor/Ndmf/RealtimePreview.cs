@@ -14,18 +14,18 @@ namespace net.puk06.PropertySyncer.Editor.Ndmf
     {
         public ImmutableList<RenderGroup> GetTargetGroups(ComputeContext context)
         {
-            IEnumerable<GameObject> avatarGameObjects = context.GetAvatarRoots().Distinct();
+            var avatarGameObjects = context.GetAvatarRoots().Distinct();
 
-            List<RenderGroup> targetRenderGroups = new();
+            var targetRenderGroups = new List<RenderGroup>();
 
-            foreach (GameObject avatarGameObject in avatarGameObjects)
+            foreach (var avatarGameObject in avatarGameObjects)
             {
                 try
                 {
-                    AbstractMaterialPropertySync[] components = context.GetComponentsInChildren<AbstractMaterialPropertySync>(avatarGameObject, true);
+                    var components = context.GetComponentsInChildren<AbstractMaterialPropertySync>(avatarGameObject, true);
                     if (components.Length == 0) continue;
 
-                    List<Material> targetMaterials = new();
+                    var targetMaterials = new List<Material>();
 
                     foreach (AbstractMaterialPropertySync component in components)
                     {
@@ -36,10 +36,10 @@ namespace net.puk06.PropertySyncer.Editor.Ndmf
                         }
                     }
 
-                    List<Renderer> targetRenderers = new();
-                    foreach (Renderer avatarRenderer in context.GetComponentsInChildren<Renderer>(avatarGameObject, true).Where(r => r is MeshRenderer or SkinnedMeshRenderer))
+                    var targetRenderers = new List<Renderer>();
+                    foreach (var avatarRenderer in context.GetComponentsInChildren<Renderer>(avatarGameObject, true).Where(r => r is MeshRenderer or SkinnedMeshRenderer))
                     {
-                        Material[] materials = context.Observe(avatarRenderer, i => i.sharedMaterials, (a, b) => a != null && b != null && a.SequenceEqual(b));
+                        var materials = context.Observe(avatarRenderer, i => i.sharedMaterials, (a, b) => a != null && b != null && a.SequenceEqual(b));
                         if (materials == null) continue;
 
                         if (materials.Any(i => targetMaterials.Contains(i)))
@@ -64,16 +64,17 @@ namespace net.puk06.PropertySyncer.Editor.Ndmf
 
         public Task<IRenderFilterNode> Instantiate(RenderGroup group, IEnumerable<(Renderer, Renderer)> proxyPairs, ComputeContext context)
         {
-            Dictionary<Renderer, Material?[]>? processedMaterialDictionary = new();
+            var processedMaterialDictionary = new Dictionary<Renderer, Material?[]>();
+            Dictionary<Material, Material>? materialMap = null;
 
             try
             {
-                GameObject root = group.GetData<GameObject>();
+                var root = group.GetData<GameObject>();
 
-                AbstractMaterialPropertySync[] components = root.GetComponentsInChildren<AbstractMaterialPropertySync>(true);
+                var components = root.GetComponentsInChildren<AbstractMaterialPropertySync>(true);
                 if (components.Length == 0) return Task.FromResult<IRenderFilterNode>(new EmptyNode());
 
-                foreach (AbstractMaterialPropertySync component in components)
+                foreach (var component in components)
                 {
                     context.Observe(component);
                     if (component.SourceMaterial != null)
@@ -83,44 +84,55 @@ namespace net.puk06.PropertySyncer.Editor.Ndmf
                     context.Observe(component, c => new List<Material?>(c.TargetMaterials), (a, b) => a.SequenceEqual(b));
                 }
 
+                var processedDict = NdmfProcessor.BuildProcessedMaterialDictionary(
+                    components, proxyPairs.Select(p => p.Item2), isPreview: true);
+
+                materialMap = new();
+
                 foreach ((Renderer original, Renderer proxy) in proxyPairs)
                 {
-                    processedMaterialDictionary[original] = NdmfProcessor.SyncShadowSettingsInRenderer(components, proxy, isPreview: true);
+                    var result = NdmfProcessor.GetReplacedMaterials(proxy.sharedMaterials, processedDict, materialMap);
+                    if (result != proxy.sharedMaterials)
+                        processedMaterialDictionary[original] = result;
                 }
 
-                return Task.FromResult<IRenderFilterNode>(new MaterialReplacerNode(processedMaterialDictionary));
+                return Task.FromResult<IRenderFilterNode>(new MaterialReplacerNode(processedMaterialDictionary, materialMap.Values));
             }
             catch (Exception ex)
             {
                 Debug.LogError($"Failed to instantiate.\n{ex}");
+                if (materialMap != null)
+                {
+                    foreach (var material in materialMap.Values)
+                        Object.DestroyImmediate(material);
+                }
                 if (processedMaterialDictionary != null)
                 {
-                    foreach (Material?[] materials in processedMaterialDictionary.Values)
-                        foreach (Material? material in materials)
-                            if (material != null) Object.DestroyImmediate(material);
                     processedMaterialDictionary.Clear();
                     processedMaterialDictionary = null;
                 }
-                return Task.FromResult<IRenderFilterNode>(new MaterialReplacerNode(null));
+                return Task.FromResult<IRenderFilterNode>(new MaterialReplacerNode(null, null));
             }
         }
 
         private class MaterialReplacerNode : IRenderFilterNode, IDisposable
         {
             private Dictionary<Renderer, Material?[]>? _processedMaterialDictionary;
+            private IEnumerable<Material>? _createdMaterials;
 
             public RenderAspects WhatChanged { get; private set; } = RenderAspects.Texture | RenderAspects.Material;
 
-            public MaterialReplacerNode(Dictionary<Renderer, Material?[]>? processedMaterialDictionary)
+            public MaterialReplacerNode(Dictionary<Renderer, Material?[]>? processedMaterialDictionary, IEnumerable<Material>? createdMaterials)
             {
                 _processedMaterialDictionary = processedMaterialDictionary;
+                _createdMaterials = createdMaterials;
             }
 
             public void OnFrame(Renderer original, Renderer proxy)
             {
                 try
                 {
-                    if (_processedMaterialDictionary?.TryGetValue(original, out Material?[] processedMaterials) ?? false)
+                    if (_processedMaterialDictionary?.TryGetValue(original, out var processedMaterials) ?? false)
                     {
                         proxy.sharedMaterials = processedMaterials;
                     }
@@ -133,11 +145,15 @@ namespace net.puk06.PropertySyncer.Editor.Ndmf
 
             public void Dispose()
             {
+                if (_createdMaterials != null)
+                {
+                    foreach (var material in _createdMaterials)
+                        Object.DestroyImmediate(material);
+                    _createdMaterials = null;
+                }
+
                 if (_processedMaterialDictionary != null)
                 {
-                    foreach (Material?[] materials in _processedMaterialDictionary.Values)
-                        foreach (Material? material in materials)
-                            if (material != null) Object.DestroyImmediate(material);
                     _processedMaterialDictionary.Clear();
                     _processedMaterialDictionary = null;
                 }
