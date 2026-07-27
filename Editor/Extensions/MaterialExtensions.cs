@@ -10,13 +10,13 @@ namespace net.puk06.PropertySyncer.Editor.Extension
         {
             if (material == null || action == null) return;
 
-            Shader shader = material.shader;
+            var shader = material.shader;
             if (shader == null) return;
 
             int propertyCount = ShaderUtil.GetPropertyCount(shader);
             for (int i = 0; i < propertyCount; i++)
             {
-                string propName = ShaderUtil.GetPropertyName(shader, i);
+                var propName = ShaderUtil.GetPropertyName(shader, i);
                 if (propName == null) continue;
 
                 action(ShaderUtil.GetPropertyType(shader, i), propName);

@@ -38,10 +38,10 @@ namespace net.puk06.PropertySyncer.Editor.Ndmf
     {
         protected override void Execute(BuildContext context)
         {
-            GameObject avatar = context.AvatarRootObject;
-            AbstractMaterialPropertySync[] components = avatar.GetComponentsInChildren<AbstractMaterialPropertySync>(false);
+            var avatar = context.AvatarRootObject;
+            var components = avatar.GetComponentsInChildren<AbstractMaterialPropertySync>(false);
 
-            IEnumerable<Renderer> renderers = avatar.GetComponentsInChildren<Renderer>(true).Where(r => r is MeshRenderer or SkinnedMeshRenderer);
+            var renderers = avatar.GetComponentsInChildren<Renderer>(true).Where(r => r is MeshRenderer or SkinnedMeshRenderer);
 
             var processedMaterials = NdmfProcessor.BuildProcessedMaterialDictionary(components, renderers);
             NdmfProcessor.ReplaceMaterialsInRenderers(renderers, processedMaterials);
@@ -52,15 +52,15 @@ namespace net.puk06.PropertySyncer.Editor.Ndmf
     {
         protected override void Execute(BuildContext context)
         {
-            GameObject avatar = context.AvatarRootObject;
-            AbstractMaterialPropertySync[] components = avatar.GetComponentsInChildren<AbstractMaterialPropertySync>(true);
+            var avatar = context.AvatarRootObject;
+            var components = avatar.GetComponentsInChildren<AbstractMaterialPropertySync>(true);
 
             RemoveAllComponents(components);
         }
 
         private void RemoveAllComponents(IEnumerable<Component> components)
         {
-            foreach (Component component in components)
+            foreach (var component in components)
             {
                 if (component == null) continue;
                 Object.DestroyImmediate(component);

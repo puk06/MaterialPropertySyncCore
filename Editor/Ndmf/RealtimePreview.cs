@@ -27,7 +27,7 @@ namespace net.puk06.PropertySyncer.Editor.Ndmf
 
                     var targetMaterials = new List<Material>();
 
-                    foreach (AbstractMaterialPropertySync component in components)
+                    foreach (var component in components)
                     {
                         foreach (Material? material in component.TargetMaterials)
                         {
