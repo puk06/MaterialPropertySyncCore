@@ -66,6 +66,9 @@ namespace net.puk06.PropertySyncer.Editor.Ndmf
         {
             if (processedMaterialDictionary.Count == 0) return;
 
+            var registeredOriginals = new HashSet<Material>();
+            var replacedMaterials = new HashSet<Material>();
+
             foreach (var renderer in renderers)
             {
                 var materials = renderer.sharedMaterials;
@@ -74,13 +77,19 @@ namespace net.puk06.PropertySyncer.Editor.Ndmf
                 foreach (ref var material in materials.AsSpan())
                 {
                     if (material == null) continue;
+                    if (replacedMaterials.Contains(material)) continue;
 
                     var resolved = ObjectRegistry.GetReference(material).Object as Material;
                     if (resolved == null) resolved = material;
 
                     if (processedMaterialDictionary.TryGetValue(resolved, out var processed))
                     {
-                        ObjectRegistry.RegisterReplacedObject(resolved, processed);
+                        if (!registeredOriginals.Contains(resolved))
+                        {
+                            ObjectRegistry.RegisterReplacedObject(resolved, processed);
+                            registeredOriginals.Add(resolved);
+                        }
+                        replacedMaterials.Add(processed);
                         material = processed;
                         changed = true;
                     }
